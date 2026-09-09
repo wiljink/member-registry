@@ -10,15 +10,18 @@ use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 /**
  * Imports the "Loans" result set of cic_merged_registry_extract.sql
  * (identical column headers to the sample "SQL ID output.xlsx").
  */
-class LoansImport implements ToCollection, WithChunkReading, WithHeadingRow, SkipsEmptyRows
+class LoansImport implements SkipsEmptyRows, ToCollection, WithChunkReading, WithHeadingRow
 {
     public int $created = 0;
+
     public int $updated = 0;
+
     public int $skipped = 0;
 
     /** @var array<int,string> */
@@ -26,6 +29,22 @@ class LoansImport implements ToCollection, WithChunkReading, WithHeadingRow, Ski
 
     /** @var array<string,bool> */
     public array $touchedCids = [];
+
+    /** @var array<string,bool> distinct branch names encountered in the file */
+    public array $branchesSeen = [];
+
+    protected ?string $periodDate;
+
+    /**
+     * @param  string|null  $branchOverride  optional — forces every row to this branch;
+     *                                       normally left null so each row is filed under
+     *                                       its own "Branch Code" column.
+     * @param  string|null  $period  the data month as "YYYY-MM"; stamped on every row.
+     */
+    public function __construct(protected ?string $branchOverride = null, ?string $period = null)
+    {
+        $this->periodDate = Registry::periodToDate($period)?->toDateString();
+    }
 
     public function collection(Collection $rows): void
     {
@@ -44,28 +63,36 @@ class LoansImport implements ToCollection, WithChunkReading, WithHeadingRow, Ski
                 $loan = MemberLoan::firstOrNew(['cid' => (string) $cid, 'contract_no' => (string) $contract]);
                 $isNew = ! $loan->exists;
 
+                $branch = $this->branchOverride ?? $this->pick($d, ['branch code', 'branch']);
+                if (filled($branch)) {
+                    $this->branchesSeen[$branch] = true;
+                }
+
                 $loan->fill([
-                    'role'                   => $this->pick($d, ['role']),
-                    'contract_type'          => $this->pick($d, ['contract type']),
-                    'contract_phase'         => $this->pick($d, ['contract phase']),
-                    'currency'               => $this->pick($d, ['currency']),
-                    'start_date'             => $this->date($this->pick($d, ['contract start date'])),
-                    'planned_end_date'       => $this->date($this->pick($d, ['contract end planned date'])),
-                    'actual_end_date'        => $this->date($this->pick($d, ['contract end actual date'])),
-                    'last_payment_date'      => $this->date($this->pick($d, ['last payment date'])),
-                    'financed_amount'        => $this->num($this->pick($d, ['financed amount'])),
-                    'monthly_payment'        => $this->num($this->pick($d, ['monthly payment amount'])),
-                    'last_payment_amount'    => $this->num($this->pick($d, ['last payment amount'])),
-                    'outstanding_balance'    => $this->num($this->pick($d, ['outstanding balance'])),
-                    'overdue_amount'         => $this->num($this->pick($d, ['overdue payments amount'])),
-                    'installments_number'    => $this->int($this->pick($d, ['installments number'])),
+                    'branch' => $branch,
+                    'data_period' => $this->periodDate,
+                    'role' => $this->pick($d, ['role']),
+                    'contract_type' => $this->pick($d, ['contract type']),
+                    'contract_phase' => $this->pick($d, ['contract phase']),
+                    'currency' => $this->pick($d, ['currency']),
+                    'start_date' => $this->date($this->pick($d, ['contract start date'])),
+                    'planned_end_date' => $this->date($this->pick($d, ['contract end planned date'])),
+                    'actual_end_date' => $this->date($this->pick($d, ['contract end actual date'])),
+                    'last_payment_date' => $this->date($this->pick($d, ['last payment date'])),
+                    'financed_amount' => $this->num($this->pick($d, ['financed amount'])),
+                    'monthly_payment' => $this->num($this->pick($d, ['monthly payment amount'])),
+                    'last_payment_amount' => $this->num($this->pick($d, ['last payment amount'])),
+                    'outstanding_balance' => $this->num($this->pick($d, ['outstanding balance'])),
+                    'overdue_amount' => $this->num($this->pick($d, ['overdue payments amount'])),
+                    'installments_number' => $this->int($this->pick($d, ['installments number'])),
                     'outstanding_payments_no' => $this->int($this->pick($d, ['outstanding payments number'])),
-                    'overdue_payments_no'    => $this->int($this->pick($d, ['overdue payments number'])),
-                    'overdue_days'           => $this->int($this->pick($d, ['overdue days'])),
-                    'purpose_of_credit'      => $this->pick($d, ['purpose of credit']),
-                    'guarantors'             => $this->collectNames($d, 'guarantor name '),
-                    'linked_subjects'        => $this->collectNames($d, 'name of the linked subject '),
-                    'raw'                    => $this->rawRow($row->toArray()),
+                    'overdue_payments_no' => $this->int($this->pick($d, ['overdue payments number'])),
+                    'overdue_installments_12mo' => $this->int($this->pick($d, ['overdue installments last 12 months'])) ?? 0,
+                    'overdue_days' => $this->int($this->pick($d, ['overdue days'])),
+                    'purpose_of_credit' => $this->pick($d, ['purpose of credit']),
+                    'guarantors' => $this->collectNames($d, 'guarantor name '),
+                    'linked_subjects' => $this->collectNames($d, 'name of the linked subject '),
+                    'raw' => $this->rawRow($row->toArray()),
                 ]);
                 $loan->save();
 
@@ -152,7 +179,7 @@ class LoansImport implements ToCollection, WithChunkReading, WithHeadingRow, Ski
                 }
 
                 return CarbonImmutable::instance(
-                    \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value)
+                    Date::excelToDateTimeObject((float) $value)
                 )->toDateString();
             }
 

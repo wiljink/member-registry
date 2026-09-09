@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ImportBatch;
 use App\Models\Member;
 use App\Models\MemberLoan;
 use App\Models\User;
@@ -14,12 +15,14 @@ class RegistryFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function importFixture(string $name, string $type): void
+    protected function importFixture(string $name, string $type, ?string $branchOverride = null, string $period = '2026-09'): void
     {
         $path = base_path("tests/fixtures/{$name}");
         app(RegistryImporter::class)->run(
             new UploadedFile($path, $name, 'text/csv', null, true),
             $type,
+            $period,
+            $branchOverride,
         );
     }
 
@@ -31,20 +34,113 @@ class RegistryFlowTest extends TestCase
 
         $bernard = Member::where('cid', '1237')->firstOrFail();
         $this->assertSame('CELEDIO', $bernard->last_name);
+        $this->assertSame('Tagbilaran Branch', $bernard->branch);   // from the row's Branch Code
         $this->assertSame('Male', $bernard->sex_assigned_at_birth);
         $this->assertSame('Single', $bernard->civil_status);
         $this->assertSame('2011-01-21', $bernard->date_accepted->toDateString());
-        $this->assertNull($bernard->tin);
+        $this->assertNull($bernard->tin);   // no NID in the source row
         // present_address / sex / civil_status / date_accepted are auto-seeded → partially done
         $this->assertSame('in_progress', $bernard->completion_status);
 
         $jayson = Member::where('cid', '1256')->firstOrFail();
+        $this->assertSame('Loon Branch', $jayson->branch);          // different branch, same file
         $this->assertSame('Married', $jayson->civil_status);
         $this->assertSame('09171234567', $jayson->contact_number);
+        $this->assertSame('123-456-789-000', $jayson->tin);   // seeded from the CIC NID field
 
         $maria = Member::where('cid', '9999')->firstOrFail();
         $this->assertNull($maria->date_accepted);
         $this->assertSame('maria@example.com', $maria->email_address);
+
+        // every row is tagged with the selected data month (stored first-of-month)
+        $this->assertSame('2026-09-01', $bernard->data_period->toDateString());
+    }
+
+    public function test_period_filter_and_history(): void
+    {
+        $this->importFixture('members.csv', 'members', null, '2026-08');
+        $this->importFixture('members.csv', 'members', null, '2026-09');   // re-import → newer month wins
+
+        $this->assertEquals(['2026-09'], Member::dataPeriods()->all());
+        $this->assertSame(3, Member::query()
+            ->whereYear('data_period', 2026)->whereMonth('data_period', 9)->count());
+
+        $batch = ImportBatch::orderByDesc('id')->first();
+        $this->assertSame('2026-09-01', $batch->period->toDateString());
+    }
+
+    public function test_one_file_populates_multiple_branches(): void
+    {
+        $this->importFixture('members.csv', 'members');
+
+        $this->assertSame(2, Member::where('branch', 'Tagbilaran Branch')->count());
+        $this->assertSame(1, Member::where('branch', 'Loon Branch')->count());
+
+        // the branch list is derived from the data itself
+        $this->assertEqualsCanonicalizing(
+            ['Loon Branch', 'Tagbilaran Branch'],
+            Member::branchNames()->all(),
+        );
+    }
+
+    public function test_branch_override_wins_over_the_file(): void
+    {
+        $this->importFixture('members.csv', 'members', 'Ubay Branch');
+
+        $this->assertSame(3, Member::where('branch', 'Ubay Branch')->count());
+    }
+
+    public function test_classifier_derives_membership_fields(): void
+    {
+        $this->importFixture('members.csv', 'members');
+        $this->importFixture('loans.csv', 'loans');
+
+        // 1237: share 2000 + savings 500 = 2500 < 3000; delinquent loan; overdue in 12mo
+        $bernard = Member::where('cid', '1237')->firstOrFail();
+        $this->assertSame('Associate', $bernard->membership_type);
+        $this->assertSame('Non Full-fledged', $bernard->membership_kind);
+        $this->assertSame('Non-MIGS', $bernard->migs_status);
+        $this->assertSame('Inactive', $bernard->activity_status);
+
+        // 1256: 5000 + 100 = 5100 >= 3000; loan current; has activity
+        $jayson = Member::where('cid', '1256')->firstOrFail();
+        $this->assertSame('Regular', $jayson->membership_type);
+        $this->assertSame('Full-fledged', $jayson->membership_kind);
+        $this->assertSame('MIGS', $jayson->migs_status);
+        $this->assertSame('Active', $jayson->activity_status);
+
+        // 9999: no balances -> type/kind/active can't be computed; no loan -> MIGS
+        $maria = Member::where('cid', '9999')->firstOrFail();
+        $this->assertNull($maria->membership_type);
+        $this->assertNull($maria->membership_kind);
+        $this->assertNull($maria->activity_status);
+        $this->assertSame('MIGS', $maria->migs_status);
+    }
+
+    public function test_classifier_respects_a_manual_override_across_reimports(): void
+    {
+        $this->importFixture('members.csv', 'members');
+        $this->actingAs(User::factory()->create());
+        $jayson = Member::where('cid', '1256')->firstOrFail();
+        $this->assertSame('Regular', $jayson->membership_type);   // auto
+
+        // staff overrides Type; leaves the rest
+        $this->put(route('members.update', $jayson), [
+            'membership_type' => 'Associate',
+            'membership_kind' => $jayson->membership_kind,
+            'migs_status' => $jayson->migs_status,
+            'activity_status' => $jayson->activity_status,
+        ])->assertRedirect();
+
+        $jayson->refresh();
+        $this->assertSame('Associate', $jayson->membership_type);
+        $this->assertEqualsCanonicalizing(['membership_type'], (array) $jayson->classification_locked);
+
+        // re-import must NOT overwrite the locked field, but may refresh the others
+        $this->importFixture('members.csv', 'members');
+        $jayson->refresh();
+        $this->assertSame('Associate', $jayson->membership_type);        // kept
+        $this->assertSame('Full-fledged', $jayson->membership_kind);     // still auto
     }
 
     public function test_reimport_keeps_manual_values(): void
@@ -64,12 +160,14 @@ class RegistryFlowTest extends TestCase
         $this->assertTrue($bernard->last_imported_at->gt($firstImportedAt));
     }
 
-    public function test_loans_import_builds_rollup(): void
+    public function test_loans_import_builds_rollup_and_keeps_branch(): void
     {
         $this->importFixture('members.csv', 'members');
         $this->importFixture('loans.csv', 'loans');
 
         $this->assertSame(3, MemberLoan::count());
+        $this->assertSame('Tagbilaran Branch', MemberLoan::where('contract_no', '47000072')->value('branch'));
+        $this->assertSame('Loon Branch', MemberLoan::where('contract_no', '48000205')->value('branch'));
 
         $bernard = Member::where('cid', '1237')->firstOrFail();
         $this->assertSame(2, $bernard->loan_count);
@@ -100,7 +198,7 @@ class RegistryFlowTest extends TestCase
         $this->assertSame('complete', $member->fresh()->completion_status);
     }
 
-    public function test_registry_export_downloads(): void
+    public function test_registry_export_downloads_whole_coop_and_per_branch(): void
     {
         $this->importFixture('members.csv', 'members');
         $this->actingAs(User::factory()->create());
@@ -108,5 +206,27 @@ class RegistryFlowTest extends TestCase
         $response = $this->get(route('exports.registry'));
         $response->assertOk();
         $this->assertStringContainsString('spreadsheet', $response->headers->get('content-type'));
+
+        $this->get(route('exports.registry', ['branch' => 'Loon Branch']))->assertOk();
+        $this->get(route('exports.registry', ['period' => '2026-09']))->assertOk();
+    }
+
+    public function test_import_requires_a_file_and_a_month(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $this->from(route('imports.index'))
+            ->post(route('imports.members'), [])
+            ->assertSessionHasErrors(['file', 'period']);
+
+        $file = UploadedFile::fake()->createWithContent(
+            'members.csv', file_get_contents(base_path('tests/fixtures/members.csv'))
+        );
+        $this->post(route('imports.members'), ['file' => $file, 'period' => '2026-09'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('Tagbilaran Branch', Member::where('cid', '1237')->value('branch'));
+        $this->assertSame('Loon Branch', Member::where('cid', '1256')->value('branch'));
+        $this->assertSame('2026-09-01', Member::where('cid', '1237')->first()->data_period->toDateString());
     }
 }

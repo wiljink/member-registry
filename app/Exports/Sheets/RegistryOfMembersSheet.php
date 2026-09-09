@@ -3,6 +3,8 @@
 namespace App\Exports\Sheets;
 
 use App\Support\Registry;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -14,9 +16,9 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class RegistryOfMembersSheet implements FromCollection, WithTitle, WithEvents
+class RegistryOfMembersSheet implements FromCollection, WithEvents, WithTitle
 {
-    public function __construct(protected Collection $members) {}
+    public function __construct(protected Collection $members, protected ?string $period = null) {}
 
     public function collection(): Collection
     {
@@ -51,11 +53,15 @@ class RegistryOfMembersSheet implements FromCollection, WithTitle, WithEvents
     protected function titleBlock(Worksheet $sheet): void
     {
         $count = $this->members->count();
-        $asOf = Registry::asOfDate()->format('Y-m-d');
+        $asOf = Registry::asOfDate($this->period)->format('Y-m-d');
+        $monthLabel = $this->period
+            ? CarbonImmutable::createFromFormat('Y-m', $this->period)->format('F Y')
+            : 'all months';
 
         $sheet->setCellValue('A1', 'REGISTRY OF MEMBERS');
         $sheet->setCellValue('A2', 'CDA REPORT');
-        $sheet->setCellValue('A3', "ORO Integrated Cooperative   |   Source: CIC SQL export   |   Members: {$count}   |   Generated {$asOf}");
+        $providerCode = config('registry.provider_code');
+        $sheet->setCellValue('A3', "ORO Integrated Cooperative   |   Provider Code: {$providerCode}   |   Data month: {$monthLabel}   |   Members: {$count}   |   As of {$asOf}");
 
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(10);
@@ -97,8 +103,8 @@ class RegistryOfMembersSheet implements FromCollection, WithTitle, WithEvents
         $sheet->getStyle("A4:{$last}6")->applyFromArray([
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical'   => Alignment::VERTICAL_CENTER,
-                'wrapText'   => true,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
             ],
             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFB0B0B0']]],
         ]);
@@ -150,7 +156,7 @@ class RegistryOfMembersSheet implements FromCollection, WithTitle, WithEvents
 
         if (! empty($c['date'])) {
             try {
-                return ExcelDate::PHPToExcel($value instanceof \DateTimeInterface ? $value : \Carbon\Carbon::parse($value));
+                return ExcelDate::PHPToExcel($value instanceof \DateTimeInterface ? $value : Carbon::parse($value));
             } catch (\Throwable) {
                 return null;
             }

@@ -47,18 +47,47 @@
         </div>
 
         <div class="mr-card" style="padding:18px;">
-            <div class="mr-sec-h">Sex distribution (assigned at birth)</div>
+            <div class="mr-sec-h">Members by branch</div>
             <table class="mr-table">
+                <thead><tr><th>Branch</th><th style="text-align:right;">Members</th><th style="text-align:right;">Complete</th></tr></thead>
                 <tbody>
-                    <tr><td>Male</td><td style="text-align:right;font-weight:700;">{{ number_format($stats['male']) }}</td></tr>
-                    <tr><td>Female</td><td style="text-align:right;font-weight:700;">{{ number_format($stats['female']) }}</td></tr>
-                    <tr><td class="mr-muted">Unspecified</td><td style="text-align:right;" class="mr-muted">{{ number_format($stats['total'] - $stats['male'] - $stats['female']) }}</td></tr>
+                @forelse ($byBranch as $row)
+                    <tr>
+                        <td>{{ $row->branch }}</td>
+                        <td style="text-align:right;font-weight:700;">{{ number_format($row->total) }}</td>
+                        <td style="text-align:right;" class="mr-muted">{{ number_format($row->complete) }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="3" class="mr-muted" style="text-align:center;padding:16px;">No members imported.</td></tr>
+                @endforelse
                 </tbody>
             </table>
-            <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
-                <a class="mr-btn" href="{{ route('exports.registry') }}">Export Registry (.xlsx)</a>
-                <a class="mr-btn ghost" href="{{ route('exports.gad') }}">Export GAD report</a>
-            </div>
+
+            <div class="mr-sec-h" style="margin-top:18px;">Export</div>
+            <form method="GET" action="{{ route('exports.registry') }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <select name="branch" class="mr-select" style="width:auto;min-width:140px;"
+                        onchange="document.getElementById('gadBranch').value=this.value">
+                    <option value="">All branches</option>
+                    @foreach ($branches as $name)
+                        <option value="{{ $name }}">{{ $name }}</option>
+                    @endforeach
+                </select>
+                @if ($periods->isNotEmpty())
+                    <select name="period" class="mr-select" style="width:auto;min-width:120px;"
+                            onchange="document.getElementById('gadPeriod').value=this.value">
+                        <option value="">All months</option>
+                        @foreach ($periods as $p)
+                            <option value="{{ $p }}">{{ \Illuminate\Support\Carbon::parse($p.'-01')->format('M Y') }}</option>
+                        @endforeach
+                    </select>
+                @endif
+                <button class="mr-btn" type="submit">Export Registry (.xlsx)</button>
+            </form>
+            <form method="GET" action="{{ route('exports.gad') }}" style="margin-top:8px;">
+                <input type="hidden" name="branch" id="gadBranch" value="">
+                <input type="hidden" name="period" id="gadPeriod" value="">
+                <button class="mr-btn ghost" type="submit">Export GAD report</button>
+            </form>
         </div>
     </div>
 </x-app-layout>

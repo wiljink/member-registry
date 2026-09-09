@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\MemberClassifier;
 use App\Support\Registry;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class Member extends Model
 {
@@ -19,26 +20,30 @@ class Member extends Model
     protected function casts(): array
     {
         return [
-            'subject_reference_date'     => 'date',
-            'birth_date'                 => 'date',
-            'date_accepted'              => 'date',
-            'bod_res_date_confirmed'     => 'date',
-            'termination_date'           => 'date',
-            'share_capital_as_of'        => 'date',
-            'savings_as_of'              => 'date',
-            'earliest_loan_open_date'    => 'date',
-            'latest_loan_maturity_date'  => 'date',
-            'last_imported_at'           => 'datetime',
-            'completed_at'               => 'datetime',
-            'is_pwd'                     => 'boolean',
-            'initial_share_amount'       => 'decimal:2',
-            'initial_paid_up'            => 'decimal:2',
-            'annual_income'              => 'decimal:2',
-            'share_capital_balance'      => 'decimal:2',
-            'savings_balance'            => 'decimal:2',
-            'total_financed'             => 'decimal:2',
-            'total_outstanding'          => 'decimal:2',
-            'total_overdue_amount'       => 'decimal:2',
+            'data_period' => 'date',
+            'last_savings_txn_date' => 'date',
+            'last_share_txn_date' => 'date',
+            'classification_locked' => 'array',
+            'subject_reference_date' => 'date',
+            'birth_date' => 'date',
+            'date_accepted' => 'date',
+            'bod_res_date_confirmed' => 'date',
+            'termination_date' => 'date',
+            'share_capital_as_of' => 'date',
+            'savings_as_of' => 'date',
+            'earliest_loan_open_date' => 'date',
+            'latest_loan_maturity_date' => 'date',
+            'last_imported_at' => 'datetime',
+            'completed_at' => 'datetime',
+            'is_pwd' => 'boolean',
+            'initial_share_amount' => 'decimal:2',
+            'initial_paid_up' => 'decimal:2',
+            'annual_income' => 'decimal:2',
+            'share_capital_balance' => 'decimal:2',
+            'savings_balance' => 'decimal:2',
+            'total_financed' => 'decimal:2',
+            'total_outstanding' => 'decimal:2',
+            'total_overdue_amount' => 'decimal:2',
         ];
     }
 
@@ -46,10 +51,13 @@ class Member extends Model
      * Columns overwritten on every members-file import.
      */
     public const SOURCE_FIELDS = [
-        'branch', 'subject_reference_date', 'title_code', 'last_name', 'first_name',
+        'branch', 'data_period', 'subject_reference_date', 'title_code', 'last_name', 'first_name',
         'middle_name', 'suffix', 'gender', 'birth_date', 'civil_status_code', 'nid',
         'mobile1', 'email1', 'spouse_first_name', 'spouse_last_name', 'spouse_middle_name',
         'home_address', 'home_postal_code', 'business_address_src', 'business_postal_code',
+        // financial standing — now fed by the extract, drives the classifier
+        'share_capital_balance', 'savings_balance', 'share_capital_as_of', 'savings_as_of',
+        'last_savings_txn_date', 'last_share_txn_date',
     ];
 
     /**
@@ -59,13 +67,14 @@ class Member extends Model
     public static function seedIfNull(): array
     {
         return [
-            'present_address'       => fn (Member $m) => $m->home_address,
+            'tin' => fn (Member $m) => Registry::clean($m->nid),   // ORO stores the TIN in the CIC NID field
+            'present_address' => fn (Member $m) => $m->home_address,
             'sex_assigned_at_birth' => fn (Member $m) => Registry::genderLabel($m->gender),
-            'gender_identity'       => fn (Member $m) => Registry::genderLabel($m->gender),
-            'civil_status'          => fn (Member $m) => Registry::civilStatusLabel($m->civil_status_code),
-            'contact_number'        => fn (Member $m) => Registry::formatMobile($m->mobile1),
-            'email_address'         => fn (Member $m) => Registry::clean($m->email1),
-            'date_accepted'         => fn (Member $m) => optional(Registry::parseDateAccepted($m->home_address))->toDateString(),
+            'gender_identity' => fn (Member $m) => Registry::genderLabel($m->gender),
+            'civil_status' => fn (Member $m) => Registry::civilStatusLabel($m->civil_status_code),
+            'contact_number' => fn (Member $m) => Registry::formatMobile($m->mobile1),
+            'email_address' => fn (Member $m) => Registry::clean($m->email1),
+            'date_accepted' => fn (Member $m) => optional(Registry::parseDateAccepted($m->home_address))->toDateString(),
         ];
     }
 
@@ -87,6 +96,37 @@ class Member extends Model
                 ->orWhere('first_name', 'like', "%{$term}%")
                 ->orWhere('nid', 'like', "%{$term}%");
         });
+    }
+
+    /**
+     * The distinct branch names present in the imported data — the branch list
+     * is derived from the registry data itself, not a managed table.
+     *
+     * @return Collection<int,string>
+     */
+    public static function branchNames(): Collection
+    {
+        return static::query()
+            ->whereNotNull('branch')
+            ->where('branch', '!=', '')
+            ->distinct()
+            ->orderBy('branch')
+            ->pluck('branch');
+    }
+
+    /**
+     * The distinct data months present, newest first, as "YYYY-MM" strings.
+     *
+     * @return Collection<int,string>
+     */
+    public static function dataPeriods(): Collection
+    {
+        return static::query()
+            ->whereNotNull('data_period')
+            ->distinct()
+            ->orderByDesc('data_period')
+            ->pluck('data_period')
+            ->map(fn ($d) => Carbon::parse($d)->format('Y-m'));
     }
 
     public function fullName(): string
@@ -131,8 +171,8 @@ class Member extends Model
 
         $this->completion_status = match (true) {
             $filled === count($required) => 'complete',
-            $filled === 0                => 'pending',
-            default                      => 'in_progress',
+            $filled === 0 => 'pending',
+            default => 'in_progress',
         };
 
         $this->completed_at = $this->completion_status === 'complete'
@@ -155,6 +195,7 @@ class Member extends Model
             ->selectRaw('COALESCE(SUM(financed_amount),0) as total_financed')
             ->selectRaw('COALESCE(SUM(outstanding_balance),0) as total_outstanding')
             ->selectRaw('COALESCE(SUM(overdue_amount),0) as total_overdue_amount')
+            ->selectRaw('COALESCE(SUM(overdue_installments_12mo),0) as overdue_installments_12mo')
             ->selectRaw('MAX(overdue_days) as max_overdue_days')
             ->selectRaw('SUM(CASE WHEN COALESCE(overdue_days,0) > 0 THEN 1 ELSE 0 END) as delinquent_loan_count')
             ->selectRaw('MIN(start_date) as earliest_loan_open_date')
@@ -167,22 +208,33 @@ class Member extends Model
             ->when($cids, fn ($q) => $q->whereIn('cid', $cids))
             ->update([
                 'loan_count' => 0, 'total_financed' => 0, 'total_outstanding' => 0,
-                'total_overdue_amount' => 0, 'max_overdue_days' => null,
-                'delinquent_loan_count' => 0, 'earliest_loan_open_date' => null,
-                'latest_loan_maturity_date' => null,
+                'total_overdue_amount' => 0, 'overdue_installments_12mo' => 0,
+                'max_overdue_days' => null, 'delinquent_loan_count' => 0,
+                'earliest_loan_open_date' => null, 'latest_loan_maturity_date' => null,
             ]);
 
         foreach ($agg as $cid => $row) {
             Member::where('cid', $cid)->update([
-                'loan_count'                => $row->loan_count,
-                'total_financed'            => $row->total_financed,
-                'total_outstanding'         => $row->total_outstanding,
-                'total_overdue_amount'      => $row->total_overdue_amount,
-                'max_overdue_days'          => $row->max_overdue_days,
-                'delinquent_loan_count'     => $row->delinquent_loan_count,
-                'earliest_loan_open_date'   => $row->earliest_loan_open_date,
+                'loan_count' => $row->loan_count,
+                'total_financed' => $row->total_financed,
+                'total_outstanding' => $row->total_outstanding,
+                'total_overdue_amount' => $row->total_overdue_amount,
+                'overdue_installments_12mo' => $row->overdue_installments_12mo,
+                'max_overdue_days' => $row->max_overdue_days,
+                'delinquent_loan_count' => $row->delinquent_loan_count,
+                'earliest_loan_open_date' => $row->earliest_loan_open_date,
                 'latest_loan_maturity_date' => $row->latest_loan_maturity_date,
             ]);
         }
+
+        // Loan standing changed → re-derive the membership classification.
+        Member::query()
+            ->when($cids, fn ($q) => $q->whereIn('cid', $cids))
+            ->get()
+            ->each(function (Member $m) {
+                MemberClassifier::apply($m);
+                $m->recomputeCompletion();
+                $m->save();
+            });
     }
 }

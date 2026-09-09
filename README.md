@@ -53,13 +53,17 @@ result sets**:
 
 ## 2. Import
 
-First add your branches on the **Branches** page (or `php artisan app:make-branch "Name"`).
+**Imports** page → pick the **data month**, then upload the Members file and the Loans file.
+**One file each — all branches together.**
 
-**Imports** page → **pick the branch this file belongs to**, then upload the Members file,
-then the Loans file. Repeat per branch.
-
-- The selected branch is stamped on every imported member and loan, **overriding** the
-  file's own Branch Code column.
+- Pick the **data month** the extract represents. Every row is tagged with it (`data_period`),
+  and the Members list + export can be filtered by month. A period-scoped export sets the
+  registry's as-of date to that month's last day.
+- Each row is filed under **its own `Branch Code` value** from the extract. That column
+  *is* the branch list — the Members filter and the export branch picker are built from the
+  distinct branch values actually present in the data. There is no separate branch table.
+- No need to split the extract or import per branch/month. (`php artisan app:import-file
+  members <path> --period=YYYY-MM --branch="X"` for a one-off from the CLI.)
 - Members are upserted by **CID**.
 - Every import **rewrites the CIC source columns** (name, gender, DOB, address, …).
 - **Hand-keyed columns are never touched.** A few are *seeded once* while still blank:
@@ -68,19 +72,39 @@ then the Loans file. Repeat per branch.
   note inside the address — **best-effort, verify it**).
 - After a Loans import the loan-portfolio roll-up on each member is recomputed.
 
+### Auto-classified fields
+
+**Type of membership**, **Kind of membership**, **MIGS / Non-MIGS** and **Active / Inactive**
+are derived on every import from the member's financial standing and refreshed each time —
+**but a hand-edit on the form locks that one field** and later imports leave it alone.
+
+| Field | Rule |
+|---|---|
+| Kind | (share capital + savings) ≥ ₱3,000 → Full-fledged, else Non Full-fledged |
+| Type | same threshold → Regular, else Associate |
+| MIGS | not delinquent on any loan → MIGS, else Non-MIGS (no loan = MIGS) |
+| Active | had a savings **or** share transaction, **and** (no loan, or loan kept current for 12 months) → Active, else Inactive |
+
+Threshold: `REGISTRY_SHARE_SAVINGS_THRESHOLD` in `.env` (default 3000). The four inputs
+(`Share Capital Balance`, `Savings Balance`, `Last Savings/Share Transaction Date`) are
+placeholder columns in `cic_merged_registry_extract.sql` — **fill in the joins to your
+savings/shares sub-ledgers**. "Overdue Installments Last 12 Months" is already computed in
+the SQL from the loan schedule.
+
 ## 3. Fill the gaps
 
 **Members** page → filter by completion status → open a member. The form is grouped to
 match the registry; the sidebar checklist shows what is still required. Dropdown choices
-live in `config/registry.php`.
+live in `config/registry.php`. The **Financial standing** block is read-only (it comes from
+the extract and explains the classification above it).
 
 A member becomes **complete** once every field in `config('registry.required_for_complete')`
 is filled.
 
 ## 4. Export
 
-**Export Registry** (whole co-op, or pick a branch on the Dashboard / `?branch=` on the URL)
-produces a workbook with four sheets:
+**Export Registry** (whole co-op, or scope by branch and/or data month on the Dashboard /
+`?branch=` `?period=YYYY-MM` on the URL) produces a workbook with four sheets:
 
 1. **REGISTRY OF MEMBERS** — the exact CDA template (3-tier header, column order A→AS).
    `AGE` is a live formula against the as-of date on the Notes sheet.

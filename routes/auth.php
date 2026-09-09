@@ -23,17 +23,14 @@ Route::middleware('guest')->group(function () {
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
-    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
-        ->name('password.request');
-
-    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
-        ->name('password.email');
-
-    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
-
-    Route::post('reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.store');
+    // Self-service password reset needs a real mailer. This tool ships with
+    // MAIL_MAILER=log and admin-managed accounts, so it is disabled — an admin
+    // resets a password with:  php artisan app:make-user "Name" email@oro.coop
+    // Configure SMTP and un-comment these four routes to enable it.
+    // Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
+    // Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
+    // Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+    // Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store');
 });
 
 Route::middleware('auth')->group(function () {

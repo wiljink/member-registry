@@ -12,6 +12,20 @@
 
     <form method="GET" class="mr-toolbar">
         <input type="text" name="q" value="{{ request('q') }}" class="mr-input grow" placeholder="Search name, CID or NID…">
+        <select name="branch" class="mr-select">
+            <option value="">All branches</option>
+            @foreach ($branches as $name)
+                <option value="{{ $name }}" @selected(request('branch') === $name)>{{ $name }}</option>
+            @endforeach
+        </select>
+        @if ($periods->isNotEmpty())
+            <select name="period" class="mr-select">
+                <option value="">Any month</option>
+                @foreach ($periods as $p)
+                    <option value="{{ $p }}" @selected(request('period') === $p)>{{ \Illuminate\Support\Carbon::parse($p.'-01')->format('M Y') }}</option>
+                @endforeach
+            </select>
+        @endif
         <select name="status" class="mr-select">
             <option value="">Any completion</option>
             @foreach (['pending' => 'Pending', 'in_progress' => 'In progress', 'complete' => 'Complete'] as $v => $l)
@@ -24,7 +38,7 @@
             <option value="delinquent" @selected(request('loans') === 'delinquent')>Delinquent</option>
         </select>
         <button class="mr-btn" type="submit">Filter</button>
-        @if (request()->hasAny(['q','status','loans']))
+        @if (request()->hasAny(['q','branch','period','status','loans']))
             <a class="mr-btn ghost" href="{{ route('members.index') }}">Reset</a>
         @endif
     </form>

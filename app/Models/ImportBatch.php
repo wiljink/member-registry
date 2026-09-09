@@ -13,6 +13,7 @@ class ImportBatch extends Model
     {
         return [
             'errors' => 'array',
+            'period' => 'date',
         ];
     }
 

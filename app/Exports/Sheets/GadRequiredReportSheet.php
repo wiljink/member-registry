@@ -14,7 +14,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
  * Body numbers are computed from the members collection; the Total row uses
  * SUM formulas (template convention).
  */
-class GadRequiredReportSheet implements FromCollection, WithTitle, WithEvents
+class GadRequiredReportSheet implements FromCollection, WithEvents, WithTitle
 {
     public function __construct(protected Collection $members) {}
 
@@ -107,7 +107,7 @@ class GadRequiredReportSheet implements FromCollection, WithTitle, WithEvents
                 $sheet->getStyle("A2:I{$r}")->applyFromArray([
                     'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
                 ]);
-                $sheet->getStyle("A2:I4")->getFont()->setBold(true);
+                $sheet->getStyle('A2:I4')->getFont()->setBold(true);
                 $sheet->getStyle("A{$r}:I{$r}")->getFont()->setBold(true);
                 $sheet->getColumnDimension('A')->setWidth(46);
                 foreach (['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'] as $col) {

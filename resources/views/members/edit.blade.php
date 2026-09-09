@@ -18,6 +18,10 @@
         .mr-actions{display:flex;gap:10px;margin:6px 0 30px;}
         .mr-loans{font-size:.78rem;}
         .mr-loans td,.mr-loans th{padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:left;}
+        .mr-addr-same{display:flex;align-items:center;gap:6px;font-size:.76rem;font-weight:600;
+            color:var(--mr-muted);text-transform:none;letter-spacing:0;margin:-2px 0 4px;cursor:pointer;user-select:none;}
+        .mr-addr-same input{width:14px;height:14px;accent-color:var(--mr-primary);cursor:pointer;}
+        textarea.mr-input.mr-mirrored{background:#f1f5f9;color:#64748b;}
     </style>
 
     @php
@@ -29,6 +33,20 @@
             'number_of_dependents' => 'No. of dependents', 'religion' => 'Religion', 'is_pwd' => 'PWD answered',
         ];
         $missing = $member->missingFields();
+
+        $classHint = function (string $field) use ($autoClass, $lockedClass) {
+            $auto = $autoClass[$field] ?? null;
+            if (is_null($auto)) {
+                return 'Auto — waiting on share capital / savings data from the extract.';
+            }
+            return in_array($field, $lockedClass, true)
+                ? "Manual override (rule says “{$auto}”). Pick “{$auto}” or clear the field to hand it back to auto."
+                : "Auto-set from the rule → “{$auto}”. Change it only to override.";
+        };
+
+        $share = (float) ($member->share_capital_balance ?? 0);
+        $savings = (float) ($member->savings_balance ?? 0);
+        $threshold = \App\Support\MemberClassifier::threshold();
     @endphp
 
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
@@ -58,7 +76,7 @@
                         <x-mr-field name="_dob" label="Date of birth" :value="optional($member->birth_date)->format('Y-m-d')" readonly />
                         <x-mr-field name="_age" label="Age (as of {{ \App\Support\Registry::asOfDate()->format('Y-m-d') }})" :value="$member->computedAge()" readonly />
                         <x-mr-field name="_gender" label="CIC gender code" :value="$member->gender" readonly />
-                        <x-mr-field name="_nid" label="National ID" :value="$member->nid" readonly />
+                        <x-mr-field name="_nid" label="CIC NID (→ TIN)" :value="$member->nid" readonly />
                         <x-mr-field name="_home" label="CIC address 1" :value="$member->home_address" readonly />
                         <x-mr-field name="_spouse" label="Spouse" :value="trim($member->spouse_first_name.' '.$member->spouse_last_name)" readonly />
                     </div>
@@ -67,26 +85,53 @@
                 <fieldset class="mr-fs">
                     <legend>Membership upon acceptance</legend>
                     <div class="mr-fgrid">
-                        <x-mr-field name="tin" label="TIN" :value="$member->tin" />
+                        <x-mr-field name="tin" label="TIN" :value="$member->tin" hint="Seeded from the CIC NID field — edit if the NID value is not the member's TIN." />
                         <x-mr-field name="date_accepted" label="Date accepted" type="date" :value="optional($member->date_accepted)->format('Y-m-d')" hint="Seeded from address text — verify against BOD records." />
                         <x-mr-field name="bod_res_date_confirmed" label="Date confirmed (BOD)" type="date" :value="optional($member->bod_res_date_confirmed)->format('Y-m-d')" />
                         <x-mr-field name="bod_res_number" label="BOD resolution number" :value="$member->bod_res_number" />
-                        <x-mr-field name="membership_type" label="Type of membership" type="select" :options="$options['membership_type']" :value="$member->membership_type" />
-                        <x-mr-field name="membership_kind" label="Kind of membership" type="select" :options="$options['membership_kind']" :value="$member->membership_kind" />
-                        <x-mr-field name="migs_status" label="MIGS / Non-MIGS" type="select" :options="$options['migs_status']" :value="$member->migs_status" />
-                        <x-mr-field name="activity_status" label="Active / Inactive" type="select" :options="$options['activity_status']" :value="$member->activity_status" />
+                        <x-mr-field name="membership_type" label="Type of membership" type="select" :options="$options['membership_type']" :value="$member->membership_type" :hint="$classHint('membership_type')" />
+                        <x-mr-field name="membership_kind" label="Kind of membership" type="select" :options="$options['membership_kind']" :value="$member->membership_kind" :hint="$classHint('membership_kind')" />
+                        <x-mr-field name="migs_status" label="MIGS / Non-MIGS" type="select" :options="$options['migs_status']" :value="$member->migs_status" :hint="$classHint('migs_status')" />
+                        <x-mr-field name="activity_status" label="Active / Inactive" type="select" :options="$options['activity_status']" :value="$member->activity_status" :hint="$classHint('activity_status')" />
                         <x-mr-field name="initial_shares" label="Initial no. of shares" type="number" :value="$member->initial_shares" />
                         <x-mr-field name="initial_share_amount" label="Initial share amount" type="number" step="0.01" :value="$member->initial_share_amount" />
                         <x-mr-field name="initial_paid_up" label="Initial paid-up" type="number" step="0.01" :value="$member->initial_paid_up" />
                     </div>
                 </fieldset>
 
-                <fieldset class="mr-fs">
+                @php
+                    $present   = old('present_address', $member->present_address);
+                    $permanent = old('permanent_address', $member->permanent_address);
+                    $business  = old('business_address', $member->business_address);
+                    $normAddr  = fn ($v) => strtoupper(preg_replace('/\s+/', ' ', trim((string) $v)));
+                    $samePerm  = filled($present) && $normAddr($present) === $normAddr($permanent);
+                    $sameBiz   = filled($present) && $normAddr($present) === $normAddr($business);
+                @endphp
+                <fieldset class="mr-fs mr-addr">
                     <legend>Address</legend>
                     <div class="mr-fgrid">
-                        <x-mr-field name="present_address" label="Present address" type="textarea" :value="$member->present_address" />
-                        <x-mr-field name="permanent_address" label="Permanent address" type="textarea" :value="$member->permanent_address" />
-                        <x-mr-field name="business_address" label="Business address" type="textarea" :value="$member->business_address" />
+                        <div class="mr-f">
+                            <label class="mr-f-label" for="present_address">Present address</label>
+                            <textarea id="present_address" name="present_address" rows="2"
+                                      class="mr-input @error('present_address') mr-invalid @enderror">{{ $present }}</textarea>
+                            @error('present_address')<div class="mr-f-err">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="mr-f">
+                            <label class="mr-f-label" for="permanent_address">Permanent address</label>
+                            <label class="mr-addr-same"><input type="checkbox" id="same_permanent" @checked($samePerm)> Same as present</label>
+                            <textarea id="permanent_address" name="permanent_address" rows="2"
+                                      class="mr-input @error('permanent_address') mr-invalid @enderror">{{ $permanent }}</textarea>
+                            @error('permanent_address')<div class="mr-f-err">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="mr-f">
+                            <label class="mr-f-label" for="business_address">Business address</label>
+                            <label class="mr-addr-same"><input type="checkbox" id="same_business" @checked($sameBiz)> Same as present</label>
+                            <textarea id="business_address" name="business_address" rows="2"
+                                      class="mr-input @error('business_address') mr-invalid @enderror">{{ $business }}</textarea>
+                            @error('business_address')<div class="mr-f-err">{{ $message }}</div>@enderror
+                        </div>
                     </div>
                 </fieldset>
 
@@ -131,12 +176,17 @@
                 </fieldset>
 
                 <fieldset class="mr-fs">
-                    <legend>Balances</legend>
+                    <legend>Financial standing — from extract (drives the classification above)</legend>
                     <div class="mr-fgrid">
-                        <x-mr-field name="share_capital_balance" label="Share capital balance" type="number" step="0.01" :value="$member->share_capital_balance" />
-                        <x-mr-field name="share_capital_as_of" label="…as of date" type="date" :value="optional($member->share_capital_as_of)->format('Y-m-d')" />
-                        <x-mr-field name="savings_balance" label="Regular savings balance" type="number" step="0.01" :value="$member->savings_balance" />
-                        <x-mr-field name="savings_as_of" label="…as of date" type="date" :value="optional($member->savings_as_of)->format('Y-m-d')" />
+                        <x-mr-field name="_scb" label="Share capital balance" :value="is_null($member->share_capital_balance) ? null : number_format($share, 2)" readonly />
+                        <x-mr-field name="_svb" label="Regular savings balance" :value="is_null($member->savings_balance) ? null : number_format($savings, 2)" readonly />
+                        <x-mr-field name="_comb" label="Combined vs ₱{{ number_format($threshold) }} threshold"
+                            :value="($member->share_capital_balance === null && $member->savings_balance === null) ? '—' : number_format($share + $savings, 2).'  ('.($share + $savings >= $threshold ? 'meets' : 'below').')'" readonly />
+                        <x-mr-field name="_asof" label="Balances as of" :value="optional($member->savings_as_of ?? $member->share_capital_as_of)->format('Y-m-d')" readonly />
+                        <x-mr-field name="_deld" label="Delinquent loans" :value="$member->delinquent_loan_count" readonly />
+                        <x-mr-field name="_o12" label="Overdue installments (last 12 mo)" :value="$member->overdue_installments_12mo" readonly />
+                        <x-mr-field name="_lsx" label="Last savings transaction" :value="optional($member->last_savings_txn_date)->format('Y-m-d')" readonly />
+                        <x-mr-field name="_lshx" label="Last share transaction" :value="optional($member->last_share_txn_date)->format('Y-m-d')" readonly />
                     </div>
                 </fieldset>
 
@@ -188,4 +238,31 @@
             </aside>
         </div>
     </form>
+
+    <script>
+        (function () {
+            var present = document.getElementById('present_address');
+            if (!present) return;
+
+            [['same_permanent', 'permanent_address'], ['same_business', 'business_address']].forEach(function (pair) {
+                var box = document.getElementById(pair[0]);
+                var target = document.getElementById(pair[1]);
+                if (!box || !target) return;
+
+                function sync() {
+                    if (box.checked) {
+                        target.value = present.value;
+                        target.readOnly = true;
+                        target.classList.add('mr-mirrored');
+                    } else {
+                        target.readOnly = false;
+                        target.classList.remove('mr-mirrored');
+                    }
+                }
+                box.addEventListener('change', sync);
+                present.addEventListener('input', function () { if (box.checked) target.value = present.value; });
+                sync();
+            });
+        })();
+    </script>
 </x-app-layout>

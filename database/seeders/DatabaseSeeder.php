@@ -13,7 +13,7 @@ class DatabaseSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'ict@orointegrated.coop'],
             [
-                'name'     => 'Registry Admin',
+                'name' => 'Registry Admin',
                 'password' => Hash::make('password'),   // CHANGE after first login
             ],
         );

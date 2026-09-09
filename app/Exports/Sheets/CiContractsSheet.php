@@ -2,7 +2,6 @@
 
 namespace App\Exports\Sheets;
 
-use App\Models\MemberLoan;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -11,7 +10,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class CiContractsSheet implements FromCollection, WithTitle, WithEvents
+class CiContractsSheet implements FromCollection, WithEvents, WithTitle
 {
     public function __construct(protected Collection $loans) {}
 

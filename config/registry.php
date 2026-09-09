@@ -13,6 +13,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | CIC provider / accessing-entity code
+    |--------------------------------------------------------------------------
+    | ORO Integrated Cooperative's assigned CIC provider code. Stamped on the
+    | registry title block and the Notes sheet; the merged SQL script also
+    | hard-codes it into the "Provider Code" column of both result sets.
+    */
+    'provider_code' => env('REGISTRY_PROVIDER_CODE', 'CO014030'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Membership classification
+    |--------------------------------------------------------------------------
+    | Combined share capital + regular savings at or above this amount makes a
+    | member "Regular" and "Full-fledged"; below it, "Associate" / "Non Full-fledged".
+    */
+    'classification' => [
+        'share_savings_threshold' => (float) env('REGISTRY_SHARE_SAVINGS_THRESHOLD', 3000),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Dropdown option lists (edit here to change what staff can pick)
     |--------------------------------------------------------------------------
     | Each list is [stored value => label shown in the form]. Stored value is
@@ -21,114 +42,114 @@ return [
     'options' => [
 
         'membership_type' => [
-            'Regular'   => 'Regular',
+            'Regular' => 'Regular',
             'Associate' => 'Associate',
         ],
 
         'membership_kind' => [
-            'Full-fledged'     => 'Full-fledged',
+            'Full-fledged' => 'Full-fledged',
             'Non Full-fledged' => 'Non Full-fledged',
         ],
 
         'migs_status' => [
-            'MIGS'     => 'MIGS',
+            'MIGS' => 'MIGS',
             'Non-MIGS' => 'Non-MIGS',
         ],
 
         'activity_status' => [
-            'Active'   => 'Active',
+            'Active' => 'Active',
             'Inactive' => 'Inactive',
         ],
 
         'civil_status' => [
-            'Single'             => 'Single',
-            'Married'            => 'Married',
-            'Widowed'            => 'Widowed',
-            'Legally Separated'  => 'Legally Separated',
-            'Annulled'           => 'Annulled',
-            'Cohabiting'         => 'Cohabiting (live-in)',
+            'Single' => 'Single',
+            'Married' => 'Married',
+            'Widowed' => 'Widowed',
+            'Legally Separated' => 'Legally Separated',
+            'Annulled' => 'Annulled',
+            'Cohabiting' => 'Cohabiting (live-in)',
         ],
 
         'sex' => [
-            'Male'      => 'Male',
-            'Female'    => 'Female',
-            'Intersex'  => 'Intersex',
+            'Male' => 'Male',
+            'Female' => 'Female',
+            'Intersex' => 'Intersex',
         ],
 
         'gender_identity' => [
-            'Male'               => 'Male',
-            'Female'             => 'Female',
-            'LGBTQIA++'          => 'LGBTQIA++',
-            'Prefer not to say'  => 'Prefer not to say',
+            'Male' => 'Male',
+            'Female' => 'Female',
+            'LGBTQIA++' => 'LGBTQIA++',
+            'Prefer not to say' => 'Prefer not to say',
         ],
 
         'education_attainment' => [
-            'No Formal Education'    => 'No Formal Education',
-            'Elementary'            => 'Elementary',
-            'Elementary Graduate'   => 'Elementary Graduate',
-            'High School'           => 'High School',
-            'High School Graduate'  => 'High School Graduate',
-            'Senior High School'    => 'Senior High School',
-            'Vocational'            => 'Vocational / Technical',
-            'College Level'         => 'College Level',
-            'College Graduate'      => 'College Graduate',
-            'Postgraduate'          => 'Postgraduate',
+            'No Formal Education' => 'No Formal Education',
+            'Elementary' => 'Elementary',
+            'Elementary Graduate' => 'Elementary Graduate',
+            'High School' => 'High School',
+            'High School Graduate' => 'High School Graduate',
+            'Senior High School' => 'Senior High School',
+            'Vocational' => 'Vocational / Technical',
+            'College Level' => 'College Level',
+            'College Graduate' => 'College Graduate',
+            'Postgraduate' => 'Postgraduate',
         ],
 
         'occupation_category' => [
-            'Government'      => 'Government',
-            'Private'        => 'Private',
-            'Self-employed'  => 'Self-employed',
-            'Unemployed'     => 'Unemployed',
+            'Government' => 'Government',
+            'Private' => 'Private',
+            'Self-employed' => 'Self-employed',
+            'Unemployed' => 'Unemployed',
         ],
 
         'occupation_status' => [
-            'Permanent'   => 'Permanent',
+            'Permanent' => 'Permanent',
             'Contractual' => 'Contractual',
-            'Casual'      => 'Casual',
-            'Seasonal'    => 'Seasonal',
-            'Retired'     => 'Retired',
+            'Casual' => 'Casual',
+            'Seasonal' => 'Seasonal',
+            'Retired' => 'Retired',
         ],
 
         'industry' => [
-            'Agriculture'                 => 'Agriculture, Forestry and Fishing',
-            'Mining'                      => 'Mining and Quarrying',
-            'Manufacturing'               => 'Manufacturing',
-            'Construction'                => 'Construction',
-            'Wholesale and Retail Trade'  => 'Wholesale and Retail Trade',
-            'Transportation'              => 'Transportation and Storage',
-            'Accommodation and Food'      => 'Accommodation and Food Service',
+            'Agriculture' => 'Agriculture, Forestry and Fishing',
+            'Mining' => 'Mining and Quarrying',
+            'Manufacturing' => 'Manufacturing',
+            'Construction' => 'Construction',
+            'Wholesale and Retail Trade' => 'Wholesale and Retail Trade',
+            'Transportation' => 'Transportation and Storage',
+            'Accommodation and Food' => 'Accommodation and Food Service',
             'Information and Communication' => 'Information and Communication',
-            'Financial and Insurance'     => 'Financial and Insurance',
-            'Real Estate'                 => 'Real Estate',
-            'Professional Services'       => 'Professional, Scientific and Technical',
-            'Administrative Services'     => 'Administrative and Support Services',
-            'Public Administration'       => 'Public Administration and Defense',
-            'Education'                   => 'Education',
-            'Health'                      => 'Human Health and Social Work',
-            'Other Services'              => 'Other Service Activities',
-            'Household Employment'        => 'Household / Domestic Work',
+            'Financial and Insurance' => 'Financial and Insurance',
+            'Real Estate' => 'Real Estate',
+            'Professional Services' => 'Professional, Scientific and Technical',
+            'Administrative Services' => 'Administrative and Support Services',
+            'Public Administration' => 'Public Administration and Defense',
+            'Education' => 'Education',
+            'Health' => 'Human Health and Social Work',
+            'Other Services' => 'Other Service Activities',
+            'Household Employment' => 'Household / Domestic Work',
         ],
 
         'religion' => [
-            'Roman Catholic'    => 'Roman Catholic',
-            'Islam'             => 'Islam',
-            'Christian'         => 'Christian (Other)',
+            'Roman Catholic' => 'Roman Catholic',
+            'Islam' => 'Islam',
+            'Christian' => 'Christian (Other)',
             'Iglesia ni Cristo' => 'Iglesia ni Cristo',
-            'Others'            => 'Others',
-            'No Religion'       => 'No Religion',
+            'Others' => 'Others',
+            'No Religion' => 'No Religion',
             'Prefer not to say' => 'Prefer not to say',
         ],
 
         'ethnicity' => [
-            'Cebuano'    => 'Cebuano',
-            'Boholano'   => 'Boholano',
-            'Tagalog'    => 'Tagalog',
-            'Ilocano'    => 'Ilocano',
-            'Bisaya'     => 'Bisaya (Other)',
-            'IP'         => 'Indigenous Peoples',
-            'Others'     => 'Others',
-            'None'       => 'None / Not applicable',
+            'Cebuano' => 'Cebuano',
+            'Boholano' => 'Boholano',
+            'Tagalog' => 'Tagalog',
+            'Ilocano' => 'Ilocano',
+            'Bisaya' => 'Bisaya (Other)',
+            'IP' => 'Indigenous Peoples',
+            'Others' => 'Others',
+            'None' => 'None / Not applicable',
         ],
 
     ],

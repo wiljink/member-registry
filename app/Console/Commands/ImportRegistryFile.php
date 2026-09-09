@@ -8,7 +8,11 @@ use Illuminate\Http\UploadedFile;
 
 class ImportRegistryFile extends Command
 {
-    protected $signature = 'app:import-file {type : members|loans} {path : path to the .xlsx/.csv file}';
+    protected $signature = 'app:import-file
+        {type : members|loans}
+        {path : path to the .xlsx/.csv file}
+        {--period= : data month as YYYY-MM (default: current month)}
+        {--branch= : optional override — force every row to this branch (default: use each row\'s Branch Code)}';
 
     protected $description = 'Import a members or loans extract from the command line';
 
@@ -16,9 +20,16 @@ class ImportRegistryFile extends Command
     {
         $type = $this->argument('type');
         $path = $this->argument('path');
+        $branch = $this->option('branch');
+        $period = $this->option('period') ?: now()->format('Y-m');
 
         if (! in_array($type, ['members', 'loans'], true)) {
             $this->error('type must be "members" or "loans"');
+
+            return self::FAILURE;
+        }
+        if (! preg_match('/^\d{4}-\d{2}$/', $period)) {
+            $this->error('--period must be YYYY-MM');
 
             return self::FAILURE;
         }
@@ -31,11 +42,13 @@ class ImportRegistryFile extends Command
         $batch = $importer->run(
             new UploadedFile($path, basename($path), null, null, true),
             $type,
+            $period,
+            $branch,
         );
 
         $this->table(
-            ['status', 'total', 'created', 'updated', 'skipped'],
-            [[$batch->status, $batch->rows_total, $batch->rows_created, $batch->rows_updated, $batch->rows_skipped]],
+            ['status', 'month', 'total', 'created', 'updated', 'skipped'],
+            [[$batch->status, $period, $batch->rows_total, $batch->rows_created, $batch->rows_updated, $batch->rows_skipped]],
         );
 
         foreach ((array) $batch->errors as $error) {

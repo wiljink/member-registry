@@ -24,7 +24,7 @@ class Registry
         return match (strtoupper(trim((string) $raw))) {
             'M', '001' => 'Male',
             'F', '002' => 'Female',
-            default    => null,
+            default => null,
         };
     }
 
@@ -36,10 +36,10 @@ class Registry
             '00M', 'M00', 'M' => 'Married',
             '00S', 'S00', 'S' => 'Single',
             '00W', 'W00', 'W' => 'Widowed',
-            '00A', 'A00'      => 'Annulled',
-            '00L', 'L00'      => 'Legally Separated',
-            '00C', 'C00'      => 'Cohabiting',
-            default           => null,
+            '00A', 'A00' => 'Annulled',
+            '00L', 'L00' => 'Legally Separated',
+            '00C', 'C00' => 'Cohabiting',
+            default => null,
         };
     }
 
@@ -115,13 +115,36 @@ class Registry
      |  As-of date
      * ------------------------------------------------------------------ */
 
-    public static function asOfDate(): CarbonImmutable
+    /**
+     * @param  string|null  $period  a "YYYY-MM" data month; when given (and no explicit
+     *                               config override is set) the as-of date is that month's
+     *                               last day, so AGE and balances line up with the data.
+     */
+    public static function asOfDate(?string $period = null): CarbonImmutable
     {
-        $configured = config('registry.as_of_date');
+        if ($configured = config('registry.as_of_date')) {
+            return CarbonImmutable::parse($configured)->startOfDay();
+        }
 
-        return $configured
-            ? CarbonImmutable::parse($configured)->startOfDay()
-            : CarbonImmutable::now()->startOfDay();
+        if ($period) {
+            return CarbonImmutable::createFromFormat('Y-m', $period)->endOfMonth()->startOfDay();
+        }
+
+        return CarbonImmutable::now()->startOfDay();
+    }
+
+    /** First day of a "YYYY-MM" month, for storing / comparing periods. */
+    public static function periodToDate(?string $period): ?CarbonImmutable
+    {
+        if (! $period) {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::createFromFormat('Y-m', $period)->startOfMonth();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /* ------------------------------------------------------------------ *
@@ -217,5 +240,6 @@ class Registry
     }
 
     public const LAST_COLUMN = 'AS';
+
     public const FIRST_DATA_ROW = 7;
 }
