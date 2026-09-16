@@ -1,4 +1,5 @@
 <nav class="mr-nav">
+    <img class="mr-logo" src="{{ asset('images/coop-logo.png') }}" alt="Cooperative logo">
     <span class="mr-brand">Member Registry</span>
 
     <a class="mr-link" href="{{ route('dashboard') }}">Dashboard</a>

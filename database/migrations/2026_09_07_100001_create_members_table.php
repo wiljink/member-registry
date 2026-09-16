@@ -65,7 +65,7 @@ return new class extends Migration
             $table->string('gender_identity')->nullable();             // seeded from gender if null
             $table->string('civil_status')->nullable();                // seeded from civil_status_code if null
             $table->string('education_attainment')->nullable();
-            $table->string('occupation_category')->nullable();         // Government / Private / Self-employed / Unemployed
+            $table->string('occupation_category')->nullable();         // seeded from occupation_category_code if null; see config/registry.php
             $table->string('actual_occupation')->nullable();
             $table->string('occupation_status')->nullable();
             $table->string('industry')->nullable();

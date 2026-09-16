@@ -96,10 +96,19 @@ return [
             'Postgraduate' => 'Postgraduate',
         ],
 
+        // "MAIN CATEGORIES" column of the registry's OCCUPATION / INCOME SOURCE
+        // block. Edit this list to change what staff can pick in the member form
+        // AND the (auto-generated) header + dropdown in the exported workbook.
         'occupation_category' => [
-            'Government' => 'Government',
-            'Private' => 'Private',
+            'Government employee' => 'Government employee',
+            'Private employee' => 'Private employee',
             'Self-employed' => 'Self-employed',
+            'Farmer / Fisherfolk' => 'Farmer / Fisherfolk',
+            'Employer' => 'Employer',
+            'Unpaid family worker' => 'Unpaid family worker',
+            'OFW' => 'OFW',
+            'Retired' => 'Retired',
+            'Student' => 'Student',
             'Unemployed' => 'Unemployed',
         ],
 

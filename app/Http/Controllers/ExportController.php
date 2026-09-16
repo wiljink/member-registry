@@ -13,6 +13,7 @@ class ExportController extends Controller
     public function registry(Request $request)
     {
         [$branch, $period] = $this->filters($request);
+        $this->raiseLimitsForBulkExport();
 
         return Excel::download(
             new RegistryWorkbookExport($branch, $period),
@@ -23,11 +24,24 @@ class ExportController extends Controller
     public function gad(Request $request)
     {
         [$branch, $period] = $this->filters($request);
+        $this->raiseLimitsForBulkExport();
 
         return Excel::download(
             new GadReportExport($branch, $period),
             $this->filename('GAD REQUIRED REPORT', $branch, $period),
         );
+    }
+
+    /**
+     * An "all branches" export builds every sheet in memory at once (no
+     * chunking/queue worker in this local admin tool), so the default
+     * memory_limit / max_execution_time are too tight once the registry
+     * grows past a few thousand members.
+     */
+    protected function raiseLimitsForBulkExport(): void
+    {
+        ini_set('memory_limit', '2048M');
+        set_time_limit(600);
     }
 
     /** @return array{0: ?string, 1: ?string} */

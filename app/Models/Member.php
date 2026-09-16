@@ -52,7 +52,7 @@ class Member extends Model
      */
     public const SOURCE_FIELDS = [
         'branch', 'data_period', 'subject_reference_date', 'title_code', 'last_name', 'first_name',
-        'middle_name', 'suffix', 'gender', 'birth_date', 'civil_status_code', 'nid',
+        'middle_name', 'suffix', 'gender', 'birth_date', 'civil_status_code', 'occupation_category_code', 'nid',
         'mobile1', 'email1', 'spouse_first_name', 'spouse_last_name', 'spouse_middle_name',
         'home_address', 'home_postal_code', 'business_address_src', 'business_postal_code',
         // financial standing — now fed by the extract, drives the classifier
@@ -72,6 +72,7 @@ class Member extends Model
             'sex_assigned_at_birth' => fn (Member $m) => Registry::genderLabel($m->gender),
             'gender_identity' => fn (Member $m) => Registry::genderLabel($m->gender),
             'civil_status' => fn (Member $m) => Registry::civilStatusLabel($m->civil_status_code),
+            'occupation_category' => fn (Member $m) => Registry::occupationCategoryLabel($m->occupation_category_code),
             'contact_number' => fn (Member $m) => Registry::formatMobile($m->mobile1),
             'email_address' => fn (Member $m) => Registry::clean($m->email1),
             'date_accepted' => fn (Member $m) => optional(Registry::parseDateAccepted($m->home_address))->toDateString(),

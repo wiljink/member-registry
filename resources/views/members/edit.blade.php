@@ -18,9 +18,11 @@
         .mr-actions{display:flex;gap:10px;margin:6px 0 30px;}
         .mr-loans{font-size:.78rem;}
         .mr-loans td,.mr-loans th{padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:left;}
+        .mr-addr .mr-fgrid{align-items:start;}
         .mr-addr-same{display:flex;align-items:center;gap:6px;font-size:.76rem;font-weight:600;
             color:var(--mr-muted);text-transform:none;letter-spacing:0;margin:-2px 0 4px;cursor:pointer;user-select:none;}
         .mr-addr-same input{width:14px;height:14px;accent-color:var(--mr-primary);cursor:pointer;}
+        .mr-addr-same.mr-addr-spacer{visibility:hidden;cursor:default;}
         textarea.mr-input.mr-mirrored{background:#f1f5f9;color:#64748b;}
     </style>
 
@@ -112,6 +114,7 @@
                     <div class="mr-fgrid">
                         <div class="mr-f">
                             <label class="mr-f-label" for="present_address">Present address</label>
+                            <span class="mr-addr-same mr-addr-spacer" aria-hidden="true"><input type="checkbox" tabindex="-1"> Same as present</span>
                             <textarea id="present_address" name="present_address" rows="2"
                                       class="mr-input @error('present_address') mr-invalid @enderror">{{ $present }}</textarea>
                             @error('present_address')<div class="mr-f-err">{{ $message }}</div>@enderror

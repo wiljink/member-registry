@@ -68,8 +68,18 @@ class CiContractsSheet implements FromCollection, WithEvents, WithTitle
                     'alignment' => ['wrapText' => true, 'vertical' => Alignment::VERTICAL_CENTER],
                 ]);
                 $sheet->freezePane('A2');
-                foreach (range('A', 'U') as $col) {
-                    $sheet->getColumnDimension($col)->setAutoSize(true);
+
+                // Fixed widths instead of setAutoSize(true): autosize makes PhpSpreadsheet
+                // measure every cell in every column, which is a major memory/CPU hit once
+                // this sheet holds thousands of loan rows (all branches, no filter).
+                $widths = [
+                    'A' => 20, 'B' => 20, 'C' => 10, 'D' => 16, 'E' => 14, 'F' => 10,
+                    'G' => 12, 'H' => 14, 'I' => 14, 'J' => 14, 'K' => 15, 'L' => 15,
+                    'M' => 16, 'N' => 16, 'O' => 14, 'P' => 12, 'Q' => 14, 'R' => 14,
+                    'S' => 12, 'T' => 30, 'U' => 30,
+                ];
+                foreach ($widths as $col => $width) {
+                    $sheet->getColumnDimension($col)->setWidth($width);
                 }
             },
         ];

@@ -41,8 +41,8 @@
 
         .gc-brand{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800;
             font-size:1.02rem;color:var(--mr-ink);margin-bottom:22px;}
-        .gc-brand .mark{width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;
-            background:linear-gradient(150deg,var(--mr-primary-dark),var(--mr-primary));color:#fff;}
+        .gc-brand .mark{width:34px;height:34px;flex:none;display:grid;place-items:center;}
+        .gc-brand .mark img{width:100%;height:100%;object-fit:contain;}
     </style>
 </head>
 <body>
@@ -51,7 +51,7 @@
         <div class="gc-body">
             <div class="gc-brand">
                 <span class="mark">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <img src="{{ asset('images/coop-logo.png') }}" alt="Cooperative logo">
                 </span>
                 {{ config('app.name', 'Member Registry') }}
             </div>

@@ -1,4 +1,4 @@
-Provider Subject No,Last Name,First Name,Middle Name,Suffix,Gender,Date of Birth,Civil Status,Identification 1: Number,Contact 1: Value,Contact 2: Value,Address 1: FullAddress,Branch Code,Share Capital Balance,Savings Balance,Last Savings Transaction Date,Last Share Transaction Date
-1237,CELEDIO,BERNARD,MONTALBAN,,M,1987-08-25,00S,,,,"POBLACION, DAUIS, BOHOL (D/A 1/21/2011)",Tagbilaran Branch,2000,500,2026-08-15,
-1256,JULIO,JAYSON,DIGAMON,,M,2003-10-17,00M,123-456-789-000,9171234567,,PUROK 4 LOON BOHOL,Loon Branch,5000,100,2026-09-01,2026-07-01
-9999,DELA CRUZ,MARIA,SANTOS,,F,1990-01-01,00W,,,maria@example.com,SOME ADDRESS WITH NO TOKEN,Tagbilaran Branch,,,,
+Provider Subject No,Last Name,First Name,Middle Name,Suffix,Gender,Date of Birth,Civil Status,Occupation Category Code,Occupation Category,Identification 1: Number,Contact 1: Value,Contact 2: Value,Address 1: FullAddress,Branch Code,Share Capital Balance,Savings Balance,Last Savings Transaction Date,Last Share Transaction Date
+1237,CELEDIO,BERNARD,MONTALBAN,,M,1987-08-25,00S,004,Pensioner,,,,"POBLACION, DAUIS, BOHOL (D/A 1/21/2011)",Tagbilaran Branch,2000,500,2026-08-15,
+1256,JULIO,JAYSON,DIGAMON,,M,2003-10-17,00M,,Government,123-456-789-000,9171234567,,PUROK 4 LOON BOHOL,Loon Branch,5000,100,2026-09-01,2026-07-01
+9999,DELA CRUZ,MARIA,SANTOS,,F,1990-01-01,00W,007,Other,,,maria@example.com,SOME ADDRESS WITH NO TOKEN,Tagbilaran Branch,,,,

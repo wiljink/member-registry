@@ -102,6 +102,11 @@ class MembersImport implements SkipsEmptyRows, ToCollection, WithChunkReading, W
             'gender' => $this->pick($d, ['gender']),
             'birth_date' => $this->date($this->pick($d, ['date of birth', 'birth date'])),
             'civil_status_code' => $this->pick($d, ['civil status']),
+            // the extract carries both the decoded label and the raw code — prefer the
+            // label (the code column loses its leading zeros to Excel: "002" -> "2"),
+            // fall back to the code (pick() stops at the first header that exists, even if empty)
+            'occupation_category_code' => $this->pick($d, ['occupation category'])
+                ?? $this->pick($d, ['occupation category code']),
             'nid' => $this->pick($d, ['identification 1 number', 'id 1 number', 'nid', 'employment tin']),
             'mobile1' => $this->pick($d, ['contact 1 value', 'mobile1']),
             'email1' => $this->pick($d, ['contact 2 value', 'email1']),

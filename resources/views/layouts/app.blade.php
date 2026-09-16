@@ -20,6 +20,7 @@
         .mr-nav{position:sticky;top:0;z-index:50;height:var(--mr-nav-h);display:flex;align-items:center;
             gap:6px;padding:0 22px;background:linear-gradient(90deg,var(--mr-primary-dark),var(--mr-primary));
             box-shadow:0 2px 10px rgba(30,58,138,.25);}
+        .mr-logo{height:32px;width:auto;margin-right:10px;flex:none;}
         .mr-brand{color:#fff;font-weight:800;letter-spacing:.02em;margin-right:18px;white-space:nowrap;}
         .mr-nav a.mr-link{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;
             color:rgba(255,255,255,.8);font-weight:600;font-size:.85rem;}

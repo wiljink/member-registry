@@ -47,4 +47,17 @@ class ImportController extends Controller
 
         return back()->with($batch->rows_skipped > 0 ? 'warning' : 'success', $msg);
     }
+
+    /**
+     * Remove an import-history entry. This only deletes the log row — the member
+     * and loan records the import created/updated are left exactly as they are
+     * (they are merged by CID across months and cannot be safely un-imported).
+     */
+    public function destroy(ImportBatch $batch)
+    {
+        $name = $batch->original_filename;
+        $batch->delete();
+
+        return back()->with('success', "Deleted the import log for “{$name}”. The imported members and loans are unchanged.");
+    }
 }

@@ -42,15 +42,20 @@ class RegistryFlowTest extends TestCase
         // present_address / sex / civil_status / date_accepted are auto-seeded → partially done
         $this->assertSame('in_progress', $bernard->completion_status);
 
+        // occupation main category seeded from the per-CID CIC code ("004" = Pensioner)
+        $this->assertSame('Retired', $bernard->occupation_category);
+
         $jayson = Member::where('cid', '1256')->firstOrFail();
         $this->assertSame('Loon Branch', $jayson->branch);          // different branch, same file
         $this->assertSame('Married', $jayson->civil_status);
         $this->assertSame('09171234567', $jayson->contact_number);
         $this->assertSame('123-456-789-000', $jayson->tin);   // seeded from the CIC NID field
+        $this->assertSame('Government employee', $jayson->occupation_category);   // decoded from the text label
 
         $maria = Member::where('cid', '9999')->firstOrFail();
         $this->assertNull($maria->date_accepted);
         $this->assertSame('maria@example.com', $maria->email_address);
+        $this->assertNull($maria->occupation_category);   // CIC "Other" → left for staff to fill
 
         // every row is tagged with the selected data month (stored first-of-month)
         $this->assertSame('2026-09-01', $bernard->data_period->toDateString());
@@ -190,12 +195,70 @@ class RegistryFlowTest extends TestCase
             'membership_kind' => 'Full-fledged', 'activity_status' => 'Active',
             'present_address' => 'Dauis, Bohol', 'sex_assigned_at_birth' => 'Male',
             'civil_status' => 'Single', 'education_attainment' => 'College Graduate',
-            'occupation_category' => 'Private', 'number_of_dependents' => 2,
+            'occupation_category' => 'Private employee', 'number_of_dependents' => 2,
             'religion' => 'Roman Catholic', 'is_pwd' => '0',
         ];
         $this->put(route('members.update', $member), $payload)->assertRedirect();
 
         $this->assertSame('complete', $member->fresh()->completion_status);
+    }
+
+    public function test_backfill_occupation_command_fills_only_blank_rows(): void
+    {
+        $seeded = Member::create([
+            'cid' => 'OCC1', 'occupation_category_code' => '003', 'occupation_category' => null,
+        ]);
+        $staffSet = Member::create([
+            'cid' => 'OCC2', 'occupation_category_code' => '002', 'occupation_category' => 'Employer',
+        ]);
+        $other = Member::create([
+            'cid' => 'OCC3', 'occupation_category_code' => '007', 'occupation_category' => null,
+        ]);
+        $zeroStripped = Member::create([
+            'cid' => 'OCC4', 'occupation_category_code' => '2', 'occupation_category' => null,
+        ]);
+
+        $this->artisan('app:backfill-occupation')->assertSuccessful();
+
+        $this->assertSame('Self-employed', $seeded->fresh()->occupation_category);        // filled from "003"
+        $this->assertSame('Employer', $staffSet->fresh()->occupation_category);           // staff value untouched
+        $this->assertNull($other->fresh()->occupation_category);                          // "Other" stays blank
+        $this->assertSame('Government employee', $zeroStripped->fresh()->occupation_category); // Excel-stripped "2"
+    }
+
+    public function test_import_history_entry_can_be_deleted_without_touching_data(): void
+    {
+        $this->importFixture('members.csv', 'members');
+        $batch = ImportBatch::latest('id')->firstOrFail();
+        $this->actingAs(User::factory()->create());
+
+        $this->delete(route('imports.destroy', $batch))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('import_batches', ['id' => $batch->id]);
+        $this->assertSame(3, Member::count());   // imported rows untouched
+    }
+
+    public function test_deleting_an_import_entry_requires_auth(): void
+    {
+        $this->importFixture('members.csv', 'members');
+        $batch = ImportBatch::latest('id')->firstOrFail();
+
+        $this->delete(route('imports.destroy', $batch))->assertRedirect(route('login'));
+        $this->assertDatabaseHas('import_batches', ['id' => $batch->id]);
+    }
+
+    public function test_import_history_renders_a_delete_control_per_row(): void
+    {
+        $this->importFixture('members.csv', 'members');
+        $batch = ImportBatch::latest('id')->firstOrFail();
+        $this->actingAs(User::factory()->create());
+
+        $this->get(route('imports.index'))
+            ->assertOk()
+            ->assertSee(route('imports.destroy', $batch))
+            ->assertSee('Delete');
     }
 
     public function test_registry_export_downloads_whole_coop_and_per_branch(): void

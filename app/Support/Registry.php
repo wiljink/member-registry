@@ -44,6 +44,35 @@ class Registry
     }
 
     /**
+     * Decode the CIC "Occupation Category" (T_CIF.CIFCode2 / USERLOOKUP 62) into
+     * one of the member form's occupation_category values. Accepts either the raw
+     * numeric code ("001".."007") or the extract's already-decoded label.
+     * Returns null for "Other"/unknown/blank, or for anything the config list no
+     * longer offers.
+     */
+    public static function occupationCategoryLabel(?string $raw): ?string
+    {
+        $key = strtolower(trim((string) $raw));
+        // Excel drops the leading zeros on the CIC code column ("002" -> "2"),
+        // so normalise "2" / "02" / "002" to a bare digit before matching.
+        if (preg_match('/^0*([1-9]\d*)$/', $key, $m)) {
+            $key = $m[1];
+        }
+
+        $label = match ($key) {
+            '1', 'private', 'private employee' => 'Private employee',
+            '2', 'government', 'government employee' => 'Government employee',
+            '3', 'self-employed', 'self employed' => 'Self-employed',
+            '4', 'pensioner', 'retired' => 'Retired',
+            '5', 'student' => 'Student',
+            '6', 'farmer/fisherfolk', 'farmer / fisherfolk', 'farmer', 'fisherfolk' => 'Farmer / Fisherfolk',
+            default => null, // '7' / 'other' / '' / unrecognised
+        };
+
+        return ($label && in_array($label, self::occupationCategories(), true)) ? $label : null;
+    }
+
+    /**
      * Pull a registration date out of strings like:
      *   "POBLACION, DAUIS, BOHOL (D/A 1/21/2011)"
      *   "... D/A 12/29/18"
@@ -148,6 +177,22 @@ class Registry
     }
 
     /* ------------------------------------------------------------------ *
+     |  Dropdown option lists
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Stored values for the "MAIN CATEGORIES" occupation column, in order.
+     * Single source shared by the member form, the request validation, the
+     * exported column-Z header text and its Excel data-validation dropdown.
+     *
+     * @return list<string>
+     */
+    public static function occupationCategories(): array
+    {
+        return array_keys((array) config('registry.options.occupation_category', []));
+    }
+
+    /* ------------------------------------------------------------------ *
      |  Registry template layout
      * ------------------------------------------------------------------ */
 
@@ -195,7 +240,7 @@ class Registry
             ['col' => 'W',  't4' => null, 't5' => "GENDER\n(Male, Female, LGBTQIA++, Prefer not to say)", 't6' => null, 'field' => 'gender_identity', 'width' => 16],
             ['col' => 'X',  't4' => null, 't5' => "CIVIL STATUS\n(Married / Single / Widowed / Legally Separated / Annulled / Cohabiting)", 't6' => null, 'field' => 'civil_status', 'width' => 20],
             ['col' => 'Y',  't4' => null, 't5' => 'HIGHEST EDUCATIONAL ATTAINMENT', 't6' => null, 'field' => 'education_attainment', 'width' => 18],
-            ['col' => 'Z',  't4' => null, 't5' => 'OCCUPATION / INCOME SOURCE', 't6' => "MAIN CATEGORIES\n(Government / Private / Self-employed / Unemployed)", 'field' => 'occupation_category', 'width' => 18],
+            ['col' => 'Z',  't4' => null, 't5' => 'OCCUPATION / INCOME SOURCE', 't6' => "MAIN CATEGORIES\n(".implode(', ', self::occupationCategories()).')', 'field' => 'occupation_category', 'width' => 18],
             ['col' => 'AA', 't4' => null, 't5' => null, 't6' => 'ACTUAL OCCUPATION', 'field' => 'actual_occupation', 'width' => 18],
             ['col' => 'AB', 't4' => null, 't5' => null, 't6' => 'STATUS', 'field' => 'occupation_status', 'width' => 14],
             ['col' => 'AC', 't4' => null, 't5' => null, 't6' => 'INDUSTRY', 'field' => 'industry', 'width' => 18],

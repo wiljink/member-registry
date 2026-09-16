@@ -10,6 +10,7 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -45,6 +46,7 @@ class RegistryOfMembersSheet implements FromCollection, WithEvents, WithTitle
                 $this->styleHeader($sheet, $last);
                 $lastRow = $this->writeData($sheet, $columns, $firstRow);
                 $this->numberFormats($sheet, $columns, $firstRow, $lastRow);
+                $this->occupationCategoryDropdown($sheet, $firstRow, $lastRow);
                 $this->finish($sheet, $last, $lastRow);
             },
         ];
@@ -188,6 +190,39 @@ class RegistryOfMembersSheet implements FromCollection, WithEvents, WithTitle
                 'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFDDDDDD']]],
             ]);
         }
+    }
+
+    /**
+     * Excel data-validation dropdown on the OCCUPATION "MAIN CATEGORIES" column (Z),
+     * fed from the same config list as the member form. Applied to the data rows
+     * (or a block of blank rows when exporting an empty template) so the value in
+     * the workbook can never drift from what the app accepts.
+     */
+    protected function occupationCategoryDropdown(Worksheet $sheet, int $firstRow, int $lastRow): void
+    {
+        $list = implode(',', Registry::occupationCategories());
+
+        // Inline list validation is capped at 255 chars incl. the wrapping quotes.
+        if ($list === '' || mb_strlen($list) > 253) {
+            return;
+        }
+
+        $endRow = max($lastRow, $firstRow + 500);
+
+        $validation = new DataValidation;
+        $validation->setType(DataValidation::TYPE_LIST)
+            ->setErrorStyle(DataValidation::STYLE_STOP)
+            ->setAllowBlank(true)
+            ->setShowInputMessage(true)
+            ->setShowErrorMessage(true)
+            ->setShowDropDown(true)
+            ->setErrorTitle('Invalid category')
+            ->setError('Pick one of the listed occupation main categories.')
+            ->setPromptTitle('Occupation main category')
+            ->setPrompt('Select from the list.')
+            ->setFormula1('"'.$list.'"');
+
+        $sheet->setDataValidation("Z{$firstRow}:Z{$endRow}", $validation);
     }
 
     protected function finish(Worksheet $sheet, string $last, int $lastRow): void

@@ -20,6 +20,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/imports', [ImportController::class, 'index'])->name('imports.index');
     Route::post('/imports/members', [ImportController::class, 'members'])->name('imports.members');
     Route::post('/imports/loans', [ImportController::class, 'loans'])->name('imports.loans');
+    Route::delete('/imports/{batch}', [ImportController::class, 'destroy'])->name('imports.destroy');
 
     Route::get('/exports/registry', [ExportController::class, 'registry'])->name('exports.registry');
     Route::get('/exports/gad', [ExportController::class, 'gad'])->name('exports.gad');

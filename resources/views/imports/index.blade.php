@@ -9,6 +9,8 @@
         .mr-up input[type=file]{width:100%;font-size:.83rem;margin:4px 0 12px;}
         .mr-up input[type=month]{padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;margin:4px 0 12px;}
         .mr-errs{margin-top:4px;font-size:.76rem;color:var(--mr-err);}
+        .mr-del{background:none;border:0;color:var(--mr-err);font-weight:700;font-size:.78rem;cursor:pointer;padding:4px 7px;border-radius:6px;}
+        .mr-del:hover{background:var(--mr-err-bg);}
     </style>
 
     @php $thisMonth = now()->format('Y-m'); @endphp
@@ -56,7 +58,7 @@
     <div class="mr-card" style="padding:18px;">
         <div style="font-weight:800;margin-bottom:12px;">Import history</div>
         <table class="mr-table">
-            <thead><tr><th>When</th><th>By</th><th>Month</th><th>Branch(es)</th><th>Type</th><th>File</th><th>Total</th><th>Created</th><th>Updated</th><th>Skipped</th><th>Status</th><th>Errors</th></tr></thead>
+            <thead><tr><th>When</th><th>By</th><th>Month</th><th>Branch(es)</th><th>Type</th><th>File</th><th>Total</th><th>Created</th><th>Updated</th><th>Skipped</th><th>Status</th><th>Errors</th><th></th></tr></thead>
             <tbody>
             @forelse ($batches as $b)
                 <tr>
@@ -72,9 +74,17 @@
                     <td>{{ number_format($b->rows_skipped) }}</td>
                     <td><span class="mr-badge {{ $b->status === 'completed' ? 'complete' : ($b->status === 'failed' ? 'pending' : 'in_progress') }}">{{ $b->status }}</span></td>
                     <td class="mr-muted" style="max-width:260px;">{{ $b->errors ? \Illuminate\Support\Str::limit(implode(' | ', $b->errors), 90) : '' }}</td>
+                    <td>
+                        <form method="POST" action="{{ route('imports.destroy', $b) }}"
+                              onsubmit="return confirm('Delete this import-history entry?\n\nThe members and loans it imported stay exactly as they are — only the log line is removed.');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="mr-del">Delete</button>
+                        </form>
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="12" class="mr-muted" style="text-align:center;padding:24px;">No imports yet.</td></tr>
+                <tr><td colspan="13" class="mr-muted" style="text-align:center;padding:24px;">No imports yet.</td></tr>
             @endforelse
             </tbody>
         </table>
